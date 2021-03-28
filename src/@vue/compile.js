@@ -1,11 +1,26 @@
+import { Watcher } from './watch.js'
 // 一个更新 dom 的工具对象
-const compileUtil = {
+export const compileUtil = {
   // 通过 key 从 data 里面取值出来
   getVal(vm, dataKey) {
     return dataKey.split('.').reduce((data, currentVal) => {
       return data[currentVal]
     }, vm.$data)
   },
+
+  setVal(vm, dataKey, inputVal) {
+    return dataKey.split('.').reduce((data, currentVal) => {
+      data[currentVal] = inputVal
+    }, vm.$data)
+  },
+
+  // 获取更新的元素节点
+  getContentVal(dataKey, vm) {
+    return dataKey.replace(/\{\{(.+?)\}\}/g, (...args) => {
+      return this.getVal(vm, args[1])
+    })
+  },
+
   // 更新 v-text 或者 text 结点里面的变量
   text(node, dataKey, vm) {
     let value
@@ -13,9 +28,12 @@ const compileUtil = {
       // 替换{{taget.name}} 这部分内容
       value = dataKey.replace(/\{\{(.+?)\}\}/g, (...args) => {
         // console.log('target', args[1])
+        new Watcher(vm, args[1], (newValue) => {
+          this.updater.textUpdater(node, this.getContentVal(dataKey, vm))
+        })
         return this.getVal(vm, args[1])
       })
-      console.log('value=', value)
+      // console.log('value=', value)
     } else {
       value = this.getVal(vm, dataKey)
     }
@@ -24,15 +42,24 @@ const compileUtil = {
   // 更新 v-html
   html(node, dataKey, vm) {
     let value = this.getVal(vm, dataKey)
+    new Watcher(vm, dataKey, (newValue) => {
+      // console.log('NEW VALUE=', newValue)
+      this.updater.htmlUpdater(node, newValue)
+    })
     this.updater.htmlUpdater(node, value)
   },
   // 更新 v-model
   model(node, dataKey, vm) {
     const value = this.getVal(vm, dataKey)
+    // 绑定更新函数  数据=>视图
+    new Watcher(vm, dataKey, (newValue) => {
+      this.updater.modelUpdater(node, newValue)
+    })
+    // 视图=>数据=>视图
+    node.addEventListener('input', (e) => {
+      this.setVal(vm, dataKey, e.target.value)
+    })
     this.updater.modelUpdater(node, value)
-    /* node.addEventListenner('input', (e) => {
-      vm.$data[dataKey] = e.target.value
-    }) */
   },
   on(node, dataKey, vm, eventName) {
     const fn = vm.$options.methods && vm.$options.methods[dataKey]
