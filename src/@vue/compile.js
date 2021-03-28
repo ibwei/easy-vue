@@ -103,7 +103,7 @@ export default class Complile {
 
   // 判断是否是 dom 结点
   isElementNode(node) {
-    return node?.nodeType === 1
+    return node.nodeType === 1
   }
 
   // 编译结点
